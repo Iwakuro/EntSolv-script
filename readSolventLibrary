@@ -30,53 +30,54 @@ SEARCH2=$(cat $LibSolvent | awk -v  col2=$col_name '{print $col2}') ### column w
 
 while getopts "h" OPTION
 do
-    case $OPTION in
-		h)
-			if [[ -f $PATHSCRIPTS/help_readSolventLibrary.txt ]]; then
-				cat "$PATHSCRIPTS/help_readSolventLibrary.txt" 
-			else
-				echo "Help-File does not exist (yet)".
-			fi				
-			exit 10
-		;;
-		*)
-			echo -e "Nonexistent flag.\033[31m Aborting.\033[0m"
-			exit 10
-		;;
-    esac
-done 
+	    case $OPTION in
+		    		h)
+								if [[ -f $PATHSCRIPTS/help_readSolventLibrary.txt ]]; then
+													cat "$PATHSCRIPTS/help_readSolventLibrary.txt" 
+																else
+																					echo "Help-File does not exist (yet)".
+																								fi				
+																											exit 10
+																													;;
+																															*)
+																																			echo -e "Nonexistent flag.\033[31m Aborting.\033[0m"
+																																						exit 10
+																																								;;
+																																								    esac
+																																							    done 
 
-###### check Input: Either running number (Integer) or Name
-INPUT=$(echo $1 | sed 's/^0*//')	# remove leading zeros
-if [[ $(echo $INPUT | awk '{print NF}') -ne 1 ]]; then
-	echo "Invalid Input-Format. Please provide one entry at a time (Name or Number). Aborting."
-	exit 128
-fi
+																																							    ###### check Input: Either running number (Integer) or Name
+																																							    INPUT=$(echo $1 | sed 's/^0*//')	# remove leading zeros
+																																							    if [[ $(echo $INPUT | awk '{print NF}') -ne 1 ]]; then
+																																								    	echo "Invalid Input-Format. Please provide one entry at a time (Name or Number). Aborting."
+																																										exit 128
+																																									fi
 
-if [[ $(echo "$SEARCH1" | grep -x -c "$INPUT") -eq 1 ]]; then	### Search for Number with exact match
-	TARGET=$(echo "$SEARCH1" | grep -n -x "$INPUT" | cut -f1 -d':')
-elif [[ $(echo "$SEARCH2" | grep -i -w -c "$INPUT") -eq 1 ]]; then	### Search for Name with match 
-	TARGET=$(echo "$SEARCH2" | grep -i -n -w "$INPUT" | cut -f1 -d':')
-elif [[ $(echo "$SEARCH2" | grep -i -x -c "$INPUT") -eq 1 ]]; then	### Search for Name with exact match
-	TARGET=$(echo "$SEARCH2" | grep -i -n -x "$INPUT" | cut -f1 -d':')
-else
-	echo "Specified Solvent $INPUT is not unique or is not yet included."
-	grep -i "$INPUT" $LibSolvent
-	echo "Aborting."
-	exit 10
-fi
+																																									if [[ $(echo "$SEARCH1" | grep -x -c "$INPUT") -eq 1 ]]; then	### Search for Number with exact match
+																																											TARGET=$(echo "$SEARCH1" | grep -n -x "$INPUT" | cut -f1 -d':')
+																																										elif [[ $(echo "$SEARCH2" | grep -i -w -c "$INPUT") -eq 1 ]]; then	### Search for Name with match 
+																																												TARGET=$(echo "$SEARCH2" | grep -i -n -w "$INPUT" | cut -f1 -d':')
+																																											elif [[ $(echo "$SEARCH2" | grep -i -x -c "$INPUT") -eq 1 ]]; then	### Search for Name with exact match
+																																													TARGET=$(echo "$SEARCH2" | grep -i -n -x "$INPUT" | cut -f1 -d':')
+																																												else
+																																														echo "Specified Solvent $INPUT is not unique or is not yet included."
+																																															grep -i "$INPUT" $LibSolvent
+																																																echo "Aborting."
+																																																	exit 10
+																																																fi
 
-echo "Requested solvent: $INPUT"
-#### from now on INPUT is unique and legit
+																																																echo "Requested solvent: $INPUT"
+																																																#### from now on INPUT is unique and legit
 
 
-##### READ DATA
-HIT=$(sed -n "$TARGET"p $LibSolvent)
-Solvent=$(echo "$HIT" | awk -v col=$col_name '{print $col}')
-Permitivity=$(echo "$HIT" | awk -v col=$col_P '{print $col}')
-MolarMass=$(echo "$HIT" | awk -v col=$col_M '{print $col}')
-Density=$(echo "$HIT" | awk -v col=$col_D '{print $col}')
-vdW_Volume=$(echo "$HIT" | awk -v col=$col_V '{print $col}')
+																																																##### READ DATA
+																																																HIT=$(sed -n "$TARGET"p $LibSolvent)
+																																																Solvent=$(echo "$HIT" | awk -v col=$col_name '{print $col}')
+																																																Permitivity=$(echo "$HIT" | awk -v col=$col_P '{print $col}')
+																																																MolarMass=$(echo "$HIT" | awk -v col=$col_M '{print $col}')
+																																																Density=$(echo "$HIT" | awk -v col=$col_D '{print $col}')
+																																																vdW_Volume=$(echo "$HIT" | awk -v col=$col_V '{print $col}')
 
-#### Output
-echo -e "Solvent data for $Solvent:\nPermitivity $Permitivity\nMolarMass $MolarMass\nDensity $Density\nvdW-Volume $vdW_Volume"
+																																																#### Output
+																																																echo -e "Solvent data for $Solvent:\nPermitivity $Permitivity\nMolarMass $MolarMass\nDensity $Density\nvdW-Volume $vdW_Volume"
+
