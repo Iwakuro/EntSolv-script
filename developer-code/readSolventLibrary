@@ -1,0 +1,94 @@
+#!/bin/bash
+# by Jama Ariai (jama.ariai@oc.jlug.de)
+# reads Data from the Solvent Library
+# Syntax: readSolventLibrary [INPUT]
+# INPUT = running Entry Number or Solvent Name (case-insensitive). Use '.' instead of ',' as delimiter in Names.
+# Units: MolarMass in g/mol, Density in g/cm^3, vdW_Volume in Ang**3
+#
+
+unset INPUT TARGET HIT Solvent Permitivity MolarMass Density vdW_Volume SEARCH
+
+#### SETUP THE LIBRARY CONTAINING THE DATA
+PATHSCRIPTS=$(dirname $0)
+LibSolvent=$(find $PATHSCRIPTS/ -name "lib_*Solvents*.txt" | head -1)
+if [ ! -f $LibSolvent ]; then echo -e "\033[31mLibrary not found! Aborting.\033[0m"; exit 10; fi 
+LibHeader=$(head -1 $LibSolvent | tr '[:upper:]' '[:lower:]')
+col_P=$(echo "$LibHeader" | sed -n "1 s/permitivity.*//p" | sed 's/[^\t*]//g' | wc -c)
+col_M=$(echo "$LibHeader" | sed -n "1 s/molarmass.*//p" | sed 's/[^\t*]//g' | wc -c)
+col_D=$(echo "$LibHeader" | sed -n "1 s/density.*//p" | sed 's/[^\t*]//g' | wc -c)
+col_V=$(echo "$LibHeader" | sed -n "1 s/vdw-volume.*//p" | sed 's/[^\t*]//g' | wc -c)
+col_num=$(echo "$LibHeader" | sed -n "1 s/entry.*//p" | sed 's/[^\t*]//g' | wc -c)
+col_name=$(echo "$LibHeader" | sed -n "1 s/name.*//p" | sed 's/[^\t*]//g' | wc -c)	
+SEARCH1=$(cat $LibSolvent | awk -v  col1=$col_num '{print $col1}')	### column with numbers
+SEARCH2=$(cat $LibSolvent | awk -v  col2=$col_name '{print $col2}') ### column with names
+
+#echo Library: $LibSolvent 
+#echo Permitivity in column $col_P
+#echo Molar Mass in column $col_M
+#echo Density in column $col_D
+#echo vdW_Volume in column $col_V
+
+while getopts "h" OPTION
+do
+    case $OPTION in
+   		h)
+			if [[ -f $PATHSCRIPTS/help_readSolventLibrary.txt ]]; then
+				cat "$PATHSCRIPTS/help_readSolventLibrary.txt" 
+			else
+				echo "Help-File does not exist (yet)".
+			fi				
+			exit 10
+		;;
+		*)
+			echo -e "Nonexistent flag.\033[31m Aborting.\033[0m"
+			exit 10
+		;;
+   esac
+ done 
+
+###### check Input: Either running number (Integer) or Name
+INPUT=$(echo $1 | sed 's/^0*//')	# remove leading zeros
+if [[ $(echo $INPUT | awk '{print NF}') -ne 1 ]]; then
+	echo "Invalid Input-Format. Please provide one entry at a time (Name or Number). Aborting."
+	exit 128
+fi
+
+################ SOLVENT ALIAS
+case $INPUT in
+		ccl4) INPUT=carbontetrachloride
+		;;
+		dmf) INPUT=dimethylformamide
+		;;
+		thf) INPUT=tetrahydrofuran
+		;;
+esac
+
+
+################
+
+if [[ $(echo "$SEARCH1" | grep -x -c "$INPUT") -eq 1 ]]; then	### Search for Number with exact match
+	TARGET=$(echo "$SEARCH1" | grep -n -x "$INPUT" | cut -f1 -d':')
+elif [[ $(echo "$SEARCH2" | grep -i -w -c "$INPUT") -eq 1 ]]; then	### Search for Name with match 
+	TARGET=$(echo "$SEARCH2" | grep -i -n -w "$INPUT" | cut -f1 -d':')
+elif [[ $(echo "$SEARCH2" | grep -i -x -c "$INPUT") -eq 1 ]]; then	### Search for Name with exact match
+	TARGET=$(echo "$SEARCH2" | grep -i -n -x "$INPUT" | cut -f1 -d':')
+else
+	echo "Specified Solvent $INPUT is not unique or is not yet included."
+	grep -i "$INPUT" $LibSolvent
+	echo "Aborting."
+	exit 10
+fi
+echo "Requested solvent: $INPUT"
+
+#### from now on INPUT is unique and legit
+##### READ DATA
+HIT=$(sed -n "$TARGET"p $LibSolvent)
+Solvent=$(echo "$HIT" | awk -v col=$col_name '{print $col}')
+Permitivity=$(echo "$HIT" | awk -v col=$col_P '{print $col}')
+MolarMass=$(echo "$HIT" | awk -v col=$col_M '{print $col}')
+Density=$(echo "$HIT" | awk -v col=$col_D '{print $col}')
+vdW_Volume=$(echo "$HIT" | awk -v col=$col_V '{print $col}')
+
+#OUTPUT
+echo -e "Solvent data for $Solvent:\nPermitivity $Permitivity\nMolarMass $MolarMass\nDensity $Density\nvdW-Volume $vdW_Volume"
+

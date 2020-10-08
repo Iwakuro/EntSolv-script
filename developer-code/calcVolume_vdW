@@ -1,0 +1,251 @@
+#!/bin/bash
+#
+# by Jama Ariai (jama.ariai@oc.jlug.de)
+# analytical calculation of vdW-Volume of the given Input-Structure
+# additional 10 calculations with randomly perturbed coordinates 
+# averaged value is printed out and tested for instabilities (i.e., deviation >= 0.001 Ang**3)
+#
+# Syntax: calcVolume_vdW [FILE]
+# Output: van der Waals Volume in Ang**3
+# requires the appropiate library of atomic vdW-Radii
+#
+# citations:
+# binary for analytical calculation of vdW-Volume by Petitjean [10.1002/jcc.540150504]
+# vdW-Radius for H by Rowland and Taylor [10.1021/jp953141+]
+# vdW-Radius for He, Li, C, N, O, F, Ne, Na, Mg, Si, P, S, Cl, Ar, K, Ga, As, Se, Br, Kr, In, Sn, Te, I, Xe, Tl, Pb by Bondi [10.1021/j100785a001]
+# vdW-Radius for Be, B, Al, Ca, Ge, Rb, Sr, Sb, Cs, Ba, Bi, Po, At, Rn, Fr, Ra by Truhlar [10.1021/jp8111556]
+#
+
+# Syntax: analyzeGBV -i [input] {optional: -t VAR}
+# input delimiter: ','
+# default THRESHHOLD=0.01 variable by -t
+function numerical_analysis {
+
+	unset inp ARR GOODVALUES BADVALUES AVG diff_AVG_ARR diff_AVG_GOODVALUES GOODVALUES_avg
+	THRESHHOLD=0.01
+	inp=($(echo $input | sed 's/,/ /g'))
+	THRESHHOLDFACTOR=$(echo "1/$THRESHHOLD" | bc -l)
+	#### insert regex check: integer/floats only as input
+
+	ARR=($(echo ${inp[@]} | sed "s/ /\n/g" | sort -n)) ### sorted array from i=0 < i=n
+	i_median=$(echo "${#ARR[@]}/2" | bc -l | cut -f1 -d'.')
+
+	####### Calculate Median :$MEDIAN
+	if (( ${#ARR[@]} % 2 )); then	#uneven case, median = middle value 
+			MEDIAN=${ARR[$i_median]}				### reminder: array starts from 0 not from 1
+	else	#even case, median = average of lower and upper limit
+			helpvar=$(echo "$i_median-1" | bc -l)	### reminder: array starts from 0 not from 1
+			MEDIAN=$(echo "(${ARR[$i_median]}+${ARR[$helpvar]})/2" | sed 's/++/+/g' | bc -l)
+	fi
+
+	AVG=$(echo "(${ARR[@]})/${#ARR[@]}" | sed 's/ /+/g' | sed 's/++/+/g' | bc -l)	### arithmetic mean of ARR before the test
+
+	############## CHECK IF VALUES MEET CRITERION
+	echo ""
+	good_index=-1
+	bad_index=-1
+	sum_diff_AVG_ARR=0
+	echo -e "Criterion: |Value-Median| < Threshhold\nMedian: $MEDIAN (arithmetic mean: $AVG)\nThreshhold: $THRESHHOLD\n${#ARR[@]} values: ${ARR[@]}" >> $LOGFILE
+	for (( i=0 ; i < ${#ARR[@]} ; i++ )); do
+		CHECK[$i]=$(echo "(${ARR[$i]}-$MEDIAN)*$THRESHHOLDFACTOR" | sed 's/--/+/g' | bc -l | sed 's/-//')	#### THRESHHOLD = 1/THRESHHOLDFACTOR
+		CHECK[$i]=$(echo "${CHECK[$i]}" | head -c1)
+		diff_AVG_ARR=$(echo "${ARR[$i]}-$AVG" | sed 's/--/+/g' | bc -l | sed 's/^-//')
+		sum_diff_AVG_ARR=$(echo $sum_diff_AVG_ARR+$diff_AVG_ARR | bc -l)
+		if [[ ${CHECK[$i]} =~ ^[0\.] ]]; then			# below the threshhold. Good values
+			((good_index+=1))
+			GOODVALUES[$good_index]=${ARR[$i]}	# index of good values starts from 0 again, no relation to index from the original values
+	#		echo "Good value: ${GOODVALUES[$good_index]}"
+		else
+			((bad_index+=1))
+			BADVALUES[$bad_index]=${ARR[$i]}	# index of bad values starts from 0 again, no relation to index from the original values
+	#		echo "Bad value: ${BADVALUES[$bad_index]}"
+		fi
+	done
+	echo "${#GOODVALUES[@]} passed and ${#BADVALUES[@]} discarded." >> $LOGFILE
+
+	MAE=$(echo $sum_diff_AVG_ARR/${#ARR[@]} | bc -l) ### before the test
+	#echo "Arithmetic Mean is: $AVG"
+	#echo "MAE: $MAE"
+
+	max_significance=$(echo "${ARR[$i_median]}" | cut -f2 -d'.' | tr -cd '[:digit:]' | wc -c)	### no more than significant digits than the given values have
+
+	if [[ "${#GOODVALUES[@]}" -ne "${#ARR[@]}" ]]; then ### analyze good values only if they are different from the original ones
+
+		#### Statistics of GOODVALUES
+		if ! [[ -z ${GOODVALUES[@]} ]]; then
+			GOODVALUES_avg=$(echo "(${GOODVALUES[@]})/${#GOODVALUES[@]}" | sed 's/ /+/g' | bc -l)
+			echo "Arithmetic mean of good values: $GOODVALUES_avg" >> $LOGFILE
+			sum_diff_AVG_GOODVALUES=0
+			for (( i=0 ; i < ${#GOODVALUES[@]} ; i++ )); do
+				diff_AVG_GOODVALUES=$(echo "${GOODVALUES[$i]}-$GOODVALUES_avg" | sed 's/--/+/g' | bc -l | sed 's/^-//')
+				sum_diff_AVG_GOODVALUES=$(echo "$sum_diff_AVG_GOODVALUES+$diff_AVG_GOODVALUES" | bc -l)
+			done
+			MAE_GOODVALUES=$(echo "$sum_diff_AVG_GOODVALUES/${#GOODVALUES[@]}" | bc -l)
+			echo "MAE of good values: $MAE_GOODVALUES" >> $LOGFILE
+			#### Significant Digits: count all decimal digits and substract remaining digits after removing leading zeros
+			significance_mae_goodvalues=$(echo "$MAE_GOODVALUES" | cut -f2 -d'.')
+			significance_mae_goodvalues=$(echo "($(echo $significance_mae_goodvalues | tr -cd '[:digit:]' | wc -c)-$(echo $significance_mae_goodvalues | sed "s/^0*//" | tr -cd '[:digit:]' | wc -c))+1" | bc -l)
+			if (( "$significance_mae_goodvalues" < "$max_significance" )); then 
+				GOODVALUES_avg=$(echo "$GOODVALUES_avg" | xargs printf "%.*f\n" $significance_mae_goodvalues)
+			else
+				GOODVALUES_avg=$(echo "$GOODVALUES_avg" | xargs printf "%.*f\n" $max_significance)
+			fi
+		fi
+	fi
+		
+	#### Significant Digits: count all decimal digits and substract remaining digits after removing leading zeros
+	significance_mae=$(echo "$MAE" | cut -f2 -d'.')
+	significance_mae=$(echo "($(echo $significance_mae | tr -cd '[:digit:]' | wc -c)-$(echo $significance_mae | sed "s/^0*//" | tr -cd '[:digit:]' | wc -c))+1" | bc -l)
+	if (( "$significance_mae" < "$max_significance" )); then 
+		AVG=$(echo "$AVG" | xargs printf "%.*f\n" $significance_mae)
+	else
+		AVG=$(echo "$AVG" | xargs printf "%.*f\n" $max_significance)
+	fi
+
+	### OUTPUT
+
+	if [[ "${#GOODVALUES[@]}" -eq "${#ARR[@]}" ]]; then	### if all value are good, this is the output
+		QUALITY=1	# good
+		echo "Quality: $QUALITY" >> $LOGFILE
+		echo "All ${#ARR[@]} values passed the criterion (threshhold: $THRESHHOLD) with MAE: $MAE" >> $LOGFILE
+		echo "Final value is the arithmetic mean:" >> $LOGFILE
+		echo "$AVG" >> $LOGFILE
+	elif ! [[ -z $GOODVALUES_avg ]] && [[ "${#GOODVALUES[@]}" -gt 3 ]]; then 	### if not all but at least 10 values are good, this is the output
+		GOODVALUES_avg=$(echo "$GOODVALUES_avg" | xargs printf "%.*f\n" $significance_mae_goodvalues)
+			QUALITY=1	# good
+			echo "Quality: $QUALITY" >> $LOGFILE
+			echo "Passed/Discarded-Ratio for a set of ${#ARR[@]} values (AVG: $AVG, MAE: $MAE, Threshhold: $THRESHHOLD): ${#GOODVALUES[@]}/${#BADVALUES[@]} with new MAE: $MAE_GOODVALUES" >> $LOGFILE
+			echo "Final value is the arithmetic mean:" >> $LOGFILE
+			echo "$GOODVALUES_avg" >> $LOGFILE
+	else	### if all values are bad, this is the output
+			QUALITY=-1 # bad
+			echo "Quality: $QUALITY" >> $LOGFILE
+			echo "CAUTION! There are ${#BADVALUES[@]} of ${#ARR[@]} values not passing the criterion of $THRESHHOLD" >> $LOGFILE
+	fi
+
+
+
+
+}
+
+unset SUFFIX XYZFILE CHECK linenumber Radii Vol_vdW sumVol_vdW avgVol_vdW difference
+
+PATHSCRIPTS=$(dirname $0)
+vdWInput=temp_in.txt
+vdWOutput=temp_out.txt
+EPSTAB='5.E-6' ### (MAE about 5.E-5) randomly perturbated cartesian coordinates with each random 3-tuple following an isotropic normal law of std.dev equal to EPSTAB
+## recommended EPSTAB values: 1.E-5 (MAE about 1.E-4) to 1.E-6 (MAE about 1.E-5)
+NPERM=7 ### carries out additional Vol-calculation with randomly rotated and renumbered copies of the molecule
+FILE=$1	
+
+OPTIND=2
+while getopts "hE:N:" OPTION
+do
+    case $OPTION in
+		h)
+			cat "$PATHSCRIPTS/help_calcVolume_vdW.txt" 
+#			echo "Help-File does not exist (yet)".
+			exit 10
+		;;
+		E) EPSTAB=$OPTARG
+		;;
+		N) NPERM=$OPTARG
+		;;
+		*)
+			echo -e "Nonexistent flag.\033[31m Aborting.\033[0m"
+			exit 10
+		;;
+    esac
+done 
+
+#RadiiLib="$PATHSCRIPTS/vdW-Radii-library.txt" #### Path of vdW-Radii library
+RadiiLib=$(find $PATHSCRIPTS/ -name "lib_*vdW*Radii*.txt" | head -1) #### Path of vdW-Radii library
+if [ ! -f $RadiiLib ]; then echo -e "\033[31mLibrary for vdW-Radii not found! Aborting.\033[0m"; exit 10; fi
+if [ ! -f $FILE ]; then echo -e "\033[31mInput-File does not exist! Aborting.\033[0m"; exit 10; fi
+SUFFIX=$(echo $FILE | rev | cut -f1 -d'.' | rev)
+
+################### valid formats: XYZ and OUT
+case $SUFFIX in
+	xyz)
+		XYZFILE=$FILE
+	;;
+	out)
+		out2xyz $FILE
+		XYZFILE=$(echo $FILE | sed 's/.out/.xyz/')
+	;;
+	\?)
+		echo -e "\033[31mInvalid Format! Aborting.\033[0m"
+		exit 128
+	;;
+esac
+
+#################### ensure having a XYZ-file in XMOL-format
+
+CHECK=$(tail -1 $XYZFILE | awk '{print NF}')
+while [[ $CHECK -ne 4 ]]; do
+	sed -i "$"d $XYZFILE
+	CHECK=$(tail -1 $XYZFILE | awk '{print NF}')
+done
+sed -i 's/^[ \t]*//' $XYZFILE ### remove all leading spaces
+CHECK=$(head -1 $XYZFILE | tr -d '\r')
+re='^([0-9])+\s*$'
+if ! [[ $CHECK =~ $re ]]; then echo -e "\033[31mInvalid XYZ-format! First line must contain the number of atoms.\nAborting.\033[0m"; exit 1; fi
+((CHECK+=2))
+linenumber=$(wc -l $XYZFILE | awk '{print $1}')
+if ! [[ "$CHECK" = "$linenumber" ]]; then echo -e "\033[31mInvalid XYZ-format! First line must contain the number of atoms.\nCoordinates must start from 3rd line.\nAborting.\033[0m"; exit 1; fi
+re='^[A-Z][a-z]?(\s+[-]?[0-9]*\.[0-9]*){3}(\s+[A-Z][a-z]?(\s+[-]?[0-9]*\.[0-9]*){3})*\s*$' #### required format (case-sensitive Element Symbol followed by coordinates)
+CHECK=$(sed -n 3,"$linenumber"p $XYZFILE)
+if ! [[ $CHECK =~ $re ]]; then echo -e "\033[31mInvalid XYZ-format!\nRequirement: [Element Symbol] [x] [y] [z]\nAborting.\033[0m"; exit 128; fi
+NUMAT=$(echo "$linenumber-2" | bc -l) ### number of atoms
+
+#### write input-file for bin.ASV.1.3.11.linux64.intel (vdW-volume)
+Radii=$(cat $RadiiLib | sed '1d' | awk '{print $2 "=" $3}')
+echo -e "XYZ\n$XYZFILE\n1" > $vdWInput			### Specify Input-File
+echo $Radii >> $vdWInput						### read vdW-Radii from Library
+echo -e "$NUMAT\n0 $NPERM $EPSTAB 0 0\n\n" >> $vdWInput	
+
+bin.ASV.1.3.11.linux64.intel < $vdWInput > $vdWOutput 
+
+Vol_vdW=($(grep 'V ='  $vdWOutput | awk '{print $3}')) #### all results of analytical vdW-volume calculation
+echo "${#Vol_vdW[@]} analytical vdW-Volume calculations of $FILE were carried out (EPSTAB=$EPSTAB):"
+CHECK='NOBST , NPERM , EPSTAB , ILIST ?'
+grep -B $NUMAT "$CHECK" $vdWOutput | head -"$NUMAT"	### List of read coordinates with vdW-radii
+
+if cat $vdWOutput | sed 's/ //g' | grep -q "Atom[0-9]hasRADIUS=0.000"; then
+	echo -e "\033[31mERROR! Assignment of vdW-Radii failed!\nPlease check $LOGFILE\nAborting.\033[0m"
+	grep 'RADIUS =' $vdWOutput
+	exit 10
+fi
+
+#### LOGFILE containing Input and Output
+	LOGFILE=$(echo "log-calcVolume_vdW-"$XYZFILE".txt" | sed 's/.xyz//')
+	echo "Input:" > $LOGFILE
+	cat $vdWInput >> $LOGFILE
+	echo "Output:" >> $LOGFILE
+	cat $vdWOutput >> $LOGFILE
+	echo "Analaysis of numberical instabilities:" >> $LOGFILE
+	
+	##################### NUMERICAL ANALYSIS
+	input=$(echo ${Vol_vdW[@]} | sed 's/ /,/g')
+	numerical_analysis
+	rm $vdWInput $vdWOutput
+####
+
+#### OUTPUT
+
+if grep -q "Quality: 1" $LOGFILE; then
+	avgVol_vdW=$(tail -1 $LOGFILE | awk '{print $NF}')	### final result
+	echo -e "vdW-Volume (in Ang**3) of $FILE is: $avgVol_vdW"
+else
+	tail -1 $LOGFILE
+	echo -e "Analaysis of the vdW-Volume failed. There might be instabilities\nPlease check $LOGFILE\nAborting."
+	exit 10
+fi
+
+
+
+# benchmark: for i in 9 10 103; do if ls ./"$i"_*.xyz 1> /dev/null 2>&1; then for E in 0; do calcVolume_vdW -f "$i"_*.xyz -E "$E"; error=$(tac log-calcVolume_vdW-"$i"_*.txt | grep -m1 "MAE:" | awk '{print $NF}'); Vol=$(tail -1 log-calcVolume_vdW-"$i"_*.txt | awk '{print $1}'); echo $i $E $Vol $error; done; fi done
+# set up reference library: for i in *.xyz; do calcVolume_vdW $i >> all-data-reference-library_PBE0D3BJ_def2TZVPP_NPERM50_EPSTAB5E-6.txt; done
+# results references: for i in {1..185}; do FILE="log-calcVolume_vdW-"$i"_*.txt"; if [ -f $FILE ]; then if grep -q "Quality: 1" $FILE; then VOL=$(tail -1 $FILE); echo $i $VOL >> results-reference-library_PBE0D3BJ_def2SVP_NPERM50_EPSTAB5E-6.txt; fi; fi; done
+
+
