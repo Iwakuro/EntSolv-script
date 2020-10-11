@@ -463,7 +463,7 @@ while getopts "hs:T:P:M:D:V:cS:d:" OPTION; do
 					echo "Requested standard state correction for solute=solvent"
 				;;
 				S)	
-					if (( "$$OPTARG" >= "1" )); then	# to do: test if '-S 1' and '-S X' (X=S_n output) works
+					if (( "$OPTARG" >= "1" )); then	# to do: test if '-S 1' and '-S X' (X=S_n output) works
 						SymmNum_man=$OPTARG
 						S_rot_sym_corr=$(echo "-$R_gas*l($SymmNum_man)" | bc -l)
 						echo "Requested Symmetry Number: $SymmNum_man"
