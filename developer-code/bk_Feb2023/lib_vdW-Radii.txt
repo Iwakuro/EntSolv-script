@@ -44,4 +44,3 @@ AtomicNumber Symbol vdW-Radii
 87	Fr	3.48
 88	Ra	2.83
 
-

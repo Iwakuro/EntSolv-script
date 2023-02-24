@@ -117,4 +117,3 @@ moscovium	Mc	115	-
 livermorium	Lv	116	-
 tennessine	Ts	117	-
 oganesson	Og	118	-
-

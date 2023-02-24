@@ -1,0 +1,88 @@
+#!/bin/bash
+#
+# by Jama Ariai (jama.ariai@oc.jlug.de)
+# create a new directory. 
+# add a txt-file (index | solute | solven | temperature; '-' as placeholder)
+# add xyz-files
+# run script
+# Syntax: reproduce_Ssolv_Garza [TXT-File]
+#
+
+REFFILE=$1
+if [[ ! -f $REFFILE ]]; then 
+	echo "Cannot find reference file! Aborting."
+	exit
+fi
+cp $REFFILE bk_"$REFFILE"
+endline=$(wc -l $REFFILE | awk '{print $1}')
+
+for (( i=1 ; i<=$endline ; i++ )); do 
+	echo "... $i / $endline ..."
+	
+	### read Input with Syntax: INDEX | SOLUTE | SOLVENT | TEMPERATURE
+	line=$(sed -n "$i"p $REFFILE)
+	echo "$line"
+	index=$(echo $line | awk '{print $1}')
+	solute=$(echo $line | awk '{print $2}')
+	solvent=$(echo $line | awk '{print $3}')
+	temperature=$(echo $line | awk '{print $4}')
+	
+	### If temperature is not a floating number, use default 298.15 K
+	re='^[0-9]+([.][0-9]+)?$'
+	if ! [[ $temperature =~ $re ]] ; then 
+		temperature=298.15
+	fi
+	#echo "Temperature = $temperature K"
+	
+	### use index to find the input-file, alternatively use solute
+	re='^[0-9]+$'
+	if [[ $index =~ $re ]] ; then 
+		inputfile=$(find -maxdepth 1 -name ""$index"_*.xyz" | cut -f2-100 -d'/')
+	else 
+		inputfile=$(find -maxdepth 1 -name ""$solute".xyz" | cut -f2-100 -d'/')
+	fi
+
+	if [[ ! -f $inputfile ]] ; then
+		echo "Cannot identify Input-File. There is something wrong with line $i:"
+		echo "$line"
+	else
+		echo "Input-File: $inputfile (solvent: $solvent, T = $temperature K)"
+		if [[ "$solute" == "$solvent" ]] ; then 
+			OUTPUT=$(calcEntropySolv $inputfile -s $solvent -T $temperature -c)
+		else
+			OUTPUT=$(calcEntropySolv $inputfile -s $solvent -T $temperature)
+		fi
+		
+		S_trans_diff=$(echo "$OUTPUT" | grep "S_trans_diff" | tail -1 | awk '{print $NF}')
+		S_rot_diff=$(echo "$OUTPUT" | grep "S_rot_diff" | tail -1 | awk '{print $NF}')
+		S_trans=$(echo "$OUTPUT" | grep "S_trans" | tail -1 | awk '{print $NF}')
+		S_cav=$(echo "$OUTPUT" | grep "S_cav" | tail -1 | awk '{print $NF}')
+		S_conc=$(echo "$OUTPUT" | grep "S_conc" | tail -1 | awk '{print $NF}')
+		S_solv=$(echo "$OUTPUT" | grep "S_solv" | tail -1 | awk '{print $NF}')
+	#	echo "S_trans_diff: "$S_trans_diff""
+	#	echo "S_rot_diff: "$S_rot_diff""
+	#	echo "S_trans: "$S_trans""
+	#	echo "S_cav: "$S_cav""
+	#	echo "S_conc: "$S_conc""
+	#	echo "S_solv: "$S_solv""
+		echo "Standard Solvation Entropy = $S_solv cal/mol*K"
+		
+	#	RESULT=$(echo ""$S_solv" "$S_conc" "$S_cav" "$S_trans" "$S_trans_diff" "$S_rot_diff"")
+	#	echo "RESULT: $RESULT"
+	#	echo "i: $i"
+	#	echo "REFFILE: $REFFILE"
+		
+	#	sed -e ""$i"s/$/ "$RESULT"/" $REFFILE 
+		sed -i ""$i"s/$/ "$S_solv" "$S_conc" "$S_cav" "$S_trans" "$S_trans_diff" "$S_rot_diff"/" $REFFILE 
+		
+	fi
+	
+
+
+done
+
+
+
+
+
+

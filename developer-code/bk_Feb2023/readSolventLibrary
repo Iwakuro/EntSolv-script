@@ -92,4 +92,3 @@ vdW_Volume=$(echo "$HIT" | awk -v col=$col_V '{print $col}')
 #OUTPUT
 echo -e "Solvent data for $Solvent:\nPermitivity $Permitivity\nMolarMass $MolarMass\nDensity $Density\nvdW-Volume $vdW_Volume"
 
-

@@ -2,7 +2,7 @@ This is the help file for >>calcVolume_vdW<< (Jama Ariai)
 
 calcVolume_vdW - Analytical calculation of the van der Waals-Volume of a given Input-Structure 
 Syntax: calcVolume_vdW [FILE]
-requires the appropiate Library 'lib_vdW-Radii.txt'
+requires the appropiate Library 'lib_vdW-Radii.txt' in '~/gellrich_scripts/'
 requires 'bin.ASV.1.3.11.linux64.intel' for the analytical calculation (see http://petitjeanmichel.free.fr/itoweb.petitjean.freeware.html#ASV)
 limited to main group elements (lacking vdW-Radii for transition metals, lanthanides, and actinides)
 
@@ -14,5 +14,4 @@ binary for analytical calculation of vdW-Volume by Petitjean [10.1002/jcc.540150
 vdW-Radius for H by Rowland and Taylor [10.1021/jp953141+]
 vdW-Radius for He, Li, C, N, O, F, Ne, Na, Mg, Si, P, S, Cl, Ar, K, Ga, As, Se, Br, Kr, In, Sn, Te, I, Xe, Tl, Pb by Bondi [10.1021/j100785a001]
 vdW-Radius for Be, B, Al, Ca, Ge, Rb, Sr, Sb, Cs, Ba, Bi, Po, At, Rn, Fr, Ra by Truhlar [10.1021/jp8111556]
-
 

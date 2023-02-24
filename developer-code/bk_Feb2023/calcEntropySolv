@@ -3,15 +3,15 @@
 # by Jama Ariai (jama.ariai@oc.jlug.de)
 #
 
-#### list of Variables
+#### list of Variables in alphabetic order
 
 # Density		= Density of the solvent in g/mL
 # MW_M			= Molar Mass of the solute in g/mol
 # MW_S			= Molar Mass of the solvent in g/mol
 # N_cav			= Number of accessible cavities
 # Permitivity	= Relative Permitivity of the solvent 
-# R 			= ratio of radii, deduced from vdW-volume, of solute/solvent 
-# r_cav			= radius of the cavity in Ang
+# R 			= ???
+# r_cav			= ??? in Ang
 # r_gyr			= Radius of Gyration in Ang
 # r_z			= Help-Radius for S_rot
 # solvent		= Solvent Specification
@@ -27,13 +27,13 @@
 # S_vib			= vibrational entropy in cal/mol*K
 # Temperature	= Temperature in K
 # THETA_0		= Help-variable for S_rot
-# Vol			= net volume in Ang**3 = N_cav * V_cav
-# Vol_cav		= Volume of the cavity in Ang**3
-# Vol_free		= Volume of free per solvent particle in Ang**3
+# Vol			= ??? in Ang**3
+# Vol_cav		= ??? in Ang**3
+# Vol_free		= ??? in Ang**3
 # Vol_M			= vdW-Volume of the solute in Ang**3
 # Vol_S			= vdW-Volume of the solvent in Ang**3
-# x			= argument for the number of the accessible solvent cavities
-# y			= reduced number of density of solvent (function of permittivity)
+# x				= ???
+# y				= ???
 
 #### Fundamental Physical Constants from https://physics.nist.gov/cuu/Constants/index.html
 h_Planck='(6.62607015*10^(-34))'	# Planck Constant in J*s (https://physics.nist.gov/cgi-bin/cuu/Value?h|search_for=planck)
@@ -687,3 +687,5 @@ if [[ -f $tempWarning ]]; then echo "Please consider detected Warnings (see $RES
 removeTempFiles
 if [[ -f $XYZFILE ]] && [[ "$XYZFILE" != "$FILE" ]]; then rm $XYZFILE; fi
 
+
+## benchmark vs exp: num=$(wc -l list-compounds.txt | awk '{print $1}'); for (( i= 1 ; i <= $num; i++ )); do unset S_solv ref; T=$(sed -n "$i"p list-compounds.txt | awk '{print $4}'); soluteindex=$(sed -n "$i"p list-compounds.txt | awk '{print $1}'); solvent=$(sed -n "$i"p list-compounds.txt | awk '{print $3}' | tr '[:upper:]' '[:lower:]'); FILE=$(find . -name ""$soluteindex"_*.xyz" | cut -f2 -d'/'); solute=$(echo $FILE | cut -f2 -d'_' | cut -f1 -d '.' | tr '[:upper:]' '[:lower:]'); if [[ "$solvent" = "$solute" ]]; then S_solv=$(calcEntropySolv -f $FILE -s $solvent -T $T -c | tail -1 | awk '{print $NF}'); ref=liq; else S_solv=$(calcEntropySolv -f $FILE -s $solvent -T $T | tail -1 | awk '{print $NF}'); fi; echo $i $S_solv $solute $solvent $ref $T >> results_PBE0D3BJ_def2TZVPP.txt; done
