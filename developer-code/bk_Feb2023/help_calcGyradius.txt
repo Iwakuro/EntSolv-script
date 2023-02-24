@@ -1,7 +1,0 @@
-This is the help file for >>calcGyradius<< (Jama Ariai)
-
-calcGyradius - calculates the Center of Mass and the Radius of Gyration for a given structure (.out or .xyz) 
-Syntax: calcGyradius [INPUT]
-
-INPUT = any OUT-File or XYZ-File
-
